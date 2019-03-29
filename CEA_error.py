@@ -45,11 +45,18 @@ def img2sph(xi,eta,lonc=None,latc=None,asd=None,pa=None,opt_out=None):
     r[idx_r2] = np.nan
 
     chi = np.arctan(xi/eta) + pa
-    idx_c = np.where(chi > 2*np.pi)
 
-    for i in range(idx_c[0].shape[0]):
-        x = idx_c[1][i]
-        y = idx_c[0][i]
+    idx_c1 = np.where(chi > 2*np.pi)
+    for i in range(idx_c1[0].shape[0]):
+        x = idx_c1[1][i]
+        y = idx_c1[0][i]
+        if chi[y,x] > 2*np.pi:
+            chi[y,x] -= 2*np.pi
+
+    idx_c2 = np.where(chi < 0)
+    for i in range(idx_c2[0].shape[0]):
+        x = idx_c2[1][i]
+        y = idx_c2[0][i]
         if chi[y,x] < 0:
             chi[y,x] += 2*np.pi
 
@@ -159,9 +166,26 @@ def bvec_errorprop(header,fld,inc,azi,err_fld,err_inc,err_azi,cc_fi,cc_fa,cc_ia)
     dBr_dazi = (-a31*sin_inc*cos_azi - a32*sin_inc*sin_azi)*fld
 
     # Final variances
-    var_bp = dBp_dfld*dBp_dfld*var_fld+dBp_dinc*dBp_dinc*var_inc+dBp_dazi*dBp_dazi*var_azi+2*dBp_dfld*dBp_dinc*cov_fi+2*dBp_dfld*dBp_dazi*cov_fa+2*dBp_dinc*dBp_dazi*cov_ia
-    var_bt = dBt_dfld*dBt_dfld*var_fld+dBt_dinc*dBt_dinc*var_inc+dBt_dazi*dBt_dazi*var_azi+2*dBt_dfld*dBt_dinc*cov_fi+2*dBt_dfld*dBt_dazi*cov_fa+2*dBt_dinc*dBt_dazi*cov_ia
-    var_br = dBr_dfld*dBr_dfld*var_fld+dBr_dinc*dBr_dinc*var_inc+dBr_dazi*dBr_dazi*var_azi+2*dBr_dfld*dBr_dinc*cov_fi+2*dBr_dfld*dBr_dazi*cov_fa+2*dBr_dinc*dBr_dazi*cov_ia
+    var_bp = (dBp_dfld*dBp_dfld*var_fld
+              + dBp_dinc*dBp_dinc*var_inc
+              + dBp_dazi*dBp_dazi*var_azi
+              + 2*dBp_dfld*dBp_dinc*cov_fi
+              + 2*dBp_dfld*dBp_dazi*cov_fa
+              + 2*dBp_dinc*dBp_dazi*cov_ia)
+
+    var_bt = (dBt_dfld*dBt_dfld*var_fld
+              + dBt_dinc*dBt_dinc*var_inc
+              + dBt_dazi*dBt_dazi*var_azi
+              + 2*dBt_dfld*dBt_dinc*cov_fi
+              + 2*dBt_dfld*dBt_dazi*cov_fa
+              + 2*dBt_dinc*dBt_dazi*cov_ia)
+
+    var_br = (dBr_dfld*dBr_dfld*var_fld
+              + dBr_dinc*dBr_dinc*var_inc
+              + dBr_dazi*dBr_dazi*var_azi
+              + 2*dBr_dfld*dBr_dinc*cov_fi
+              + 2*dBr_dfld*dBr_dazi*cov_fa
+              + 2*dBr_dinc*dBr_dazi*cov_ia)
 
     return var_bp,var_bt,var_br
 
@@ -169,7 +193,7 @@ def bvec_errorprop(header,fld,inc,azi,err_fld,err_inc,err_azi,cc_fi,cc_fa,cc_ia)
 def bvecerr2cea(fld_path,inc_path,azi_path,fld_err_path,
                 inc_err_path,azi_err_path,cc_fld_inc_path,
                 cc_fld_azi_path,cc_inc_azi_path,disambig_path,
-                phi_c=None,lambda_c=None, nx=None, ny=None,
+                do_disambig=True,phi_c=None,lambda_c=None, nx=None, ny=None,
                 dx=None,dy=None,xyz=None):
     """Converts cutout vector field uncertainties to CEA maps
 
@@ -206,7 +230,7 @@ def bvecerr2cea(fld_path,inc_path,azi_path,fld_err_path,
     header = fld_map.meta
     field = fld_map.data
     inclination = np.radians(inc_map.data)
-    azi_in = azi_map.data
+    azimuth = azi_map.data
     disambig = disamb_map.data
 
     err_fld = err_fld_map.data
@@ -217,7 +241,10 @@ def bvecerr2cea(fld_path,inc_path,azi_path,fld_err_path,
     cc_fa = cc_fa_map.data
     cc_ia = cc_ia_map.data
 
-    azimuth = np.radians(hmi_disambig(azi_in,disambig,2))
+    if do_disambig == True:
+        azimuth = np.radians(hmi_disambig(azimuth,disambig,2))
+    else:
+        azimuth = np.radians(azimuth)
 
     # Check whether or not input image sizes match
     nx0 = field.shape[1]
