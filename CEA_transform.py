@@ -117,13 +117,20 @@ def find_cea_coord(header,phi_c,lambda_c,nx,ny,dx,dy):
     ny = int(ny)
 
     # Array of CEA coords
-    x = np.zeros((ny,nx))
-    y = np.zeros((ny,nx))
+    x = []
+    y = []
 
-    for i in range(nx):
-        x[:,i] = np.radians((i-(nx-1)/2)*dx)
     for j in range(ny):
-        y[j,:] = np.radians((j-(ny-1)/2)*dy)
+        col = []
+        row = []
+        for i in range(nx):
+            col.append(np.radians((i-(nx-1)/2)*dx))
+            row.append(np.radians((j-(ny-1)/2)*dy))
+        x.append(col)
+        y.append(row)
+
+    x = np.array(x)
+    y = np.array(y)
 
     # Relevant header values
     rSun = header['rsun_obs']/header['cdelt1']     #solar radius in pixels
@@ -137,21 +144,33 @@ def find_cea_coord(header,phi_c,lambda_c,nx,ny,dx,dy):
     lonc = np.radians(phi_c) - disk_lonc
 
     # Convert coordinates
-    lat = np.zeros((ny,nx))
-    lon = np.zeros((ny,nx))
-    for i in range(nx):
-        for j in range(ny):
-            lat0,lon0 = plane2sphere(x[j,i],y[j,i],latc,lonc)
-            lat[j,i] = lat0
-            lon[j,i] = lon0
+    lat = []
+    lon = []
+    xi = []
+    eta = []
 
-    xi = np.zeros((ny,nx))
-    eta = np.zeros((ny,nx))
-    for i in range(nx):
-        for j in range(ny):
-            xi0,eta0 = sphere2img(lat[j,i],lon[j,i],disk_latc,0.0,disk_xc,disk_yc,rSun,pa)
-            xi[j,i] = xi0
-            eta[j,i] = eta0
+    for j in range(ny):
+        lat_col = []
+        lon_col = []
+        xi_col = []
+        eta_col = []
+        for i in range(nx):
+            lat0,lon0 = plane2sphere(x[j,i],y[j,i],latc,lonc)
+            lat_col.append(lat0)
+            lon_col.append(lon0)
+
+            xi0,eta0 = sphere2img(lat0,lon0,disk_latc,0.0,disk_xc,disk_yc,rSun,pa)
+            xi_col.append(xi0)
+            eta_col.append(eta0)
+        lat.append(lat_col)
+        lon.append(lon_col)
+        xi.append(xi_col)
+        eta.append(eta_col)
+
+    lat = np.array(lat)
+    lon = np.array(lon)
+    xi = np.array(xi)
+    eta = np.array(eta)
 
     return xi,eta,lat,lon
 
@@ -248,7 +267,7 @@ def bvec2cea(fld_path,inc_path,azi_path,disambig_path,do_disambig=True,
     azimuth = azi_map.data
     disambig = disamb_map.data
 
-    if do_disambig == True:
+    if do_disambig:
         azimuth = np.radians(hmi_disambig(azimuth,disambig,2))
     else:
         azimuth = np.radians(azimuth)
@@ -260,7 +279,7 @@ def bvec2cea(fld_path,inc_path,azi_path,disambig_path,do_disambig=True,
 
     # Check that output params exist in header
     keys = ['crlt_obs','crln_obs','crota2','rsun_obs','cdelt1',
-            'crpix1','crpix2','LONDTMAX','LONDTMIN','LATDTMAX','LATDTMIN']
+            'crpix1','crpix2']
     for idx,key in enumerate(keys):
         try:
             header[key]
@@ -274,6 +293,7 @@ def bvec2cea(fld_path,inc_path,azi_path,disambig_path,do_disambig=True,
         minlon = header['LONDTMIN']
     except KeyError:
         print('No x center')
+        return
 
     try:
         maxlat = header['LATDTMAX']
@@ -283,23 +303,23 @@ def bvec2cea(fld_path,inc_path,azi_path,disambig_path,do_disambig=True,
         return
 
     # Check optional parameters and assign values if needed
-    if phi_c == None:
+    if not phi_c:
         phi_c = ((maxlon + minlon) / 2.0) + header['CRLN_OBS']
-    if lambda_c == None:
+    if not lambda_c:
         lambda_c = (maxlat + minlat) / 2.0
 
-    if dx == None:
+    if not dx:
         dx = 3e-2
     else:
         dx = np.abs(dx)
-    if dy == None:
+    if not dy:
         dy = 3e-2
     else:
         dy = np.abs(dy)
 
-    if nx == None:
+    if not nx:
         nx = int(np.around(np.around((maxlon - minlon) * 1e3)/1e3/dx))
-    if ny == None:
+    if not ny:
     	ny = int(np.around(np.around((maxlat - minlat) * 1e3)/1e3/dy))
 
     # Find CCD native coords and Stonyhurst coords
@@ -310,9 +330,9 @@ def bvec2cea(fld_path,inc_path,azi_path,disambig_path,do_disambig=True,
     bz_img = field * np.cos(inclination)
 
     # Get field in (xi,eta) coordinates
-    bx_map = ndimage.map_coordinates(bx_img,[eta,xi])
-    by_map = ndimage.map_coordinates(by_img,[eta,xi])
-    bz_map = ndimage.map_coordinates(bz_img,[eta,xi])
+    bx_map = ndimage.map_coordinates(bx_img,[eta,xi],order=1)
+    by_map = ndimage.map_coordinates(by_img,[eta,xi],order=1)
+    bz_map = ndimage.map_coordinates(bz_img,[eta,xi],order=1)
 
     # Vector transformation
     disk_lonc = 0.0
@@ -320,7 +340,7 @@ def bvec2cea(fld_path,inc_path,azi_path,disambig_path,do_disambig=True,
     pa = np.radians(header['crota2']*-1)
 
     bp,bt,br = img2heliovec(bx_map,by_map,bz_map,lon,lat,disk_lonc,disk_latc,pa)
-    if xyz == None:
+    if not xyz:
         bt *= -1.0
 
     header_map = prep_hd(header,phi_c,lambda_c,nx,ny,dx,dy)

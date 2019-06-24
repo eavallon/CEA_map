@@ -29,13 +29,13 @@ def img2sph(xi,eta,lonc=None,latc=None,asd=None,pa=None,opt_out=None):
         chi: position angle on image measured westward from north
     """
     # Check optional parameters and assign values if needed
-    if lonc == None:
+    if not lonc:
          lonc = 0.0
-    if latc == None:
+    if not latc:
         latc = 0.0
-    if asd == None:
+    if not asd:
         asd = 4.7026928e-3        #970 arcsec
-    if pa == None:
+    if not pa:
         pa = 0.0
 
     r = np.sqrt(xi**2 + eta**2)
@@ -128,15 +128,27 @@ def bvec_errorprop(header,fld,inc,azi,err_fld,err_inc,err_azi,cc_fi,cc_fa,cc_ia)
     lonc = 0.0
     pAng = np.radians((-1.0) * crota2)
 
-    a11 = -np.sin(latc)*np.sin(pAng)*np.sin(lon - lonc) + np.cos(pAng)*np.cos(lon - lonc)
-    a12 = np.sin(latc)*np.cos(pAng)*np.sin(lon - lonc) + np.sin(pAng)*np.cos(lon - lonc)
-    a13 = -np.cos(latc)*np.sin(lon - lonc)
-    a21 = -np.sin(lat)*(np.sin(latc)*np.sin(pAng)*np.cos(lon - lonc) + np.cos(pAng)*np.sin(lon - lonc)) - np.cos(lat)*np.cos(latc)*np.sin(pAng)
-    a22 = np.sin(lat)*(np.sin(latc)*np.cos(pAng)*np.cos(lon - lonc) - np.sin(pAng)*np.sin(lon - lonc)) + np.cos(lat)*np.cos(latc)*np.cos(pAng)
-    a23 = -np.cos(latc)*np.sin(lat)*np.cos(lon - lonc) + np.sin(latc)*np.cos(lat)
-    a31 = np.cos(lat)*(np.sin(latc)*np.sin(pAng)*np.cos(lon - lonc) + np.cos(pAng)*np.sin(lon - lonc)) - np.sin(lat)*np.cos(latc)*np.sin(pAng)
-    a32 = -np.cos(lat)*(np.sin(latc)*np.cos(pAng)*np.cos(lon - lonc) - np.sin(pAng)*np.sin(lon - lonc)) + np.sin(lat)*np.cos(latc)*np.cos(pAng)
-    a33 = np.cos(lat)*np.cos(latc)*np.cos(lon - lonc) + np.sin(lat)*np.sin(latc)
+    a11 = (-np.sin(latc)*np.sin(pAng)*np.sin(lon - lonc)
+           + np.cos(pAng)*np.cos(lon - lonc))
+    a12 = (np.sin(latc)*np.cos(pAng)*np.sin(lon - lonc)
+           + np.sin(pAng)*np.cos(lon - lonc))
+    a13 = (-np.cos(latc)*np.sin(lon - lonc))
+    a21 = (-np.sin(lat)*(np.sin(latc)*np.sin(pAng)*np.cos(lon - lonc)
+           + np.cos(pAng)*np.sin(lon - lonc))
+           - np.cos(lat)*np.cos(latc)*np.sin(pAng))
+    a22 = (np.sin(lat)*(np.sin(latc)*np.cos(pAng)*np.cos(lon - lonc)
+           - np.sin(pAng)*np.sin(lon - lonc))
+           + np.cos(lat)*np.cos(latc)*np.cos(pAng))
+    a23 = (-np.cos(latc)*np.sin(lat)*np.cos(lon - lonc)
+           + np.sin(latc)*np.cos(lat))
+    a31 = (np.cos(lat)*(np.sin(latc)*np.sin(pAng)*np.cos(lon - lonc)
+           + np.cos(pAng)*np.sin(lon - lonc))
+           - np.sin(lat)*np.cos(latc)*np.sin(pAng))
+    a32 = (-np.cos(lat)*(np.sin(latc)*np.cos(pAng)*np.cos(lon - lonc)
+           - np.sin(pAng)*np.sin(lon - lonc))
+           + np.sin(lat)*np.cos(latc)*np.cos(pAng))
+    a33 = (np.cos(lat)*np.cos(latc)*np.cos(lon - lonc)
+           + np.sin(lat)*np.sin(latc))
 
     # Sine/cosine
     sin_inc = np.sin(inc)
@@ -241,7 +253,7 @@ def bvecerr2cea(fld_path,inc_path,azi_path,fld_err_path,
     cc_fa = cc_fa_map.data
     cc_ia = cc_ia_map.data
 
-    if do_disambig == True:
+    if do_disambig:
         azimuth = np.radians(hmi_disambig(azimuth,disambig,2))
     else:
         azimuth = np.radians(azimuth)
@@ -259,7 +271,7 @@ def bvecerr2cea(fld_path,inc_path,azi_path,fld_err_path,
 
     # Check that output params exist in header
     keys = ['crlt_obs','crln_obs','crota2','rsun_obs','cdelt1',
-            'crpix1','crpix2','LONDTMAX','LONDTMIN','LATDTMAX','LATDTMIN']
+            'crpix1','crpix2']
     for idx,key in enumerate(keys):
         try:
             header[key]
@@ -267,29 +279,39 @@ def bvecerr2cea(fld_path,inc_path,azi_path,fld_err_path,
             print('Keyword '+key+' missing')
             return
 
-    maxlon = header['LONDTMAX']
-    minlon = header['LONDTMIN']
-    maxlat = header['LATDTMAX']
-    minlat = header['LATDTMIN']
+    # Get x and y coordinate center from header
+    try:
+        maxlon = header['LONDTMAX']
+        minlon = header['LONDTMIN']
+    except KeyError:
+        print('No x center')
+        return
+
+    try:
+        maxlat = header['LATDTMAX']
+        minlat = header['LATDTMIN']
+    except KeyError:
+        print('No y center')
+        return
 
     # Check optional parameters and assign values if needed
-    if phi_c == None:
+    if not phi_c:
         phi_c = (maxlon + minlon) / 2.0 + header['CRLN_OBS']
-    if lambda_c == None:
+    if not lambda_c:
         lambda_c = (maxlat + minlat) / 2.0
 
-    if dx == None:
+    if not dx:
         dx = 3e-2
     else:
         dx = np.abs(dx)
-    if dy == None:
+    if not dy:
         dy = 3e-2
     else:
         dy = np.abs(dy)
 
-    if nx == None:
+    if not nx:
         nx = int(np.around(np.around((maxlon - minlon) * 1e3)/1e3/dx))
-    if ny == None:
+    if not ny:
     	ny = int(np.around(np.around((maxlat - minlat) * 1e3)/1e3/dy))
 
     # Get variance of Bp, Bt, Br
@@ -301,9 +323,9 @@ def bvecerr2cea(fld_path,inc_path,azi_path,fld_err_path,
     xi,eta,lat,lon = find_cea_coord(header,phi_c,lambda_c,nx,ny,dx,dy)
 
     # Perform sampling
-    f_bperr_map = ndimage.map_coordinates(var_bp,[eta,xi])
-    f_bterr_map = ndimage.map_coordinates(var_bt,[eta,xi])
-    f_brerr_map = ndimage.map_coordinates(var_br,[eta,xi])
+    f_bperr_map = ndimage.map_coordinates(var_bp,[eta,xi],order=1)
+    f_bterr_map = ndimage.map_coordinates(var_bt,[eta,xi],order=1)
+    f_brerr_map = ndimage.map_coordinates(var_br,[eta,xi],order=1)
 
     err_bp = np.sqrt(f_bperr_map)
     err_bt = np.sqrt(f_bterr_map)

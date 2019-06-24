@@ -104,5 +104,5 @@ def hmi_b2ptr(field_map,bvec,header,lonlat_out=False):
     bptr[2] = k11 * b_xi + k12 * b_eta + k13 * b_zeta
 
     return bptr
-    if lonlat_out == True:
+    if lonlat_out:
         return bptr,lonlat
